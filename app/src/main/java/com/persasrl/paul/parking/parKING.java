@@ -11,6 +11,7 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
 import android.support.v4.content.ContextCompat;
+import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
 import android.widget.Toast;
 
@@ -25,13 +26,17 @@ import com.google.android.gms.maps.model.MarkerOptions;
 
 import java.io.Console;
 
-public class parKING extends AppCompatActivity implements OnMapReadyCallback, GoogleMap.OnMyLocationButtonClickListener, ActivityCompat.OnRequestPermissionsResultCallback{
+public class parKING extends AppCompatActivity implements OnMapReadyCallback,GoogleMap.OnMyLocationButtonClickListener,  ActivityCompat.OnRequestPermissionsResultCallback{
 
     private GoogleMap mMap;
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
     private boolean mPermissionDenied = false;
-    LatLng loc;
-    MyReceiver myReceiver;
+
+    public double lat,lng;
+    public float bearing;
+    public int mere=0;
+    Location location;
+    public Intent serviceIntent = new Intent(this, UserLocation.class);
 
 
     public static final CameraPosition cluj =
@@ -40,6 +45,8 @@ public class parKING extends AppCompatActivity implements OnMapReadyCallback, Go
                     .bearing(60)
                     .tilt(60)
                     .build();
+
+    public static CameraPosition actual;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -71,17 +78,13 @@ public class parKING extends AppCompatActivity implements OnMapReadyCallback, Go
         // Add a marker in Sydney and move the camera
         // mMap.addMarker(new MarkerOptions().position(cluj).title("Marker in Sydney"));
         // mMap.moveCamera(CameraUpdateFactory.newLatLng(new LatLng(46.7772, 23.5999)));
-        mMap.moveCamera(CameraUpdateFactory.newCameraPosition(cluj));
 
         }
 
     private void enableMyLocation() {
-        myReceiver = new MyReceiver();
-        IntentFilter intentFilter = new IntentFilter();
-        intentFilter.addAction(UserLocation.MY_ACTION); //De vazut cu my action asta
-        registerReceiver(myReceiver, intentFilter);
-        Intent intent = new Intent(this, UserLocation.class);
-        startService(intent);
+        LocalBroadcastManager.getInstance(this).registerReceiver(
+                LocationReciever, new IntentFilter("GPSLocationUpdates"));
+         startService(serviceIntent);
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
             // Permission to access the location is missing.
@@ -89,15 +92,18 @@ public class parKING extends AppCompatActivity implements OnMapReadyCallback, Go
                     android.Manifest.permission.ACCESS_FINE_LOCATION, true);
         } else if (mMap != null) {
             // Access to the location has been granted to the app.
-            mMap.setMyLocationEnabled(true);
+            //mMap.setMyLocationEnabled(true);
+            startService(serviceIntent);
+
         }
     }
 
     @Override
     public boolean onMyLocationButtonClick() {
-
-        Toast.makeText(this, "MyLocation button clicked", Toast.LENGTH_SHORT).show();
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(new LatLng(1, 1)));
+        if(mere==1)
+            Toast.makeText(this,"Mere amu nii", Toast.LENGTH_SHORT).show();
+        else
+            Toast.makeText(this,"Mnoh nu mere", Toast.LENGTH_SHORT).show();
         return false;
     }
 
@@ -137,22 +143,37 @@ public class parKING extends AppCompatActivity implements OnMapReadyCallback, Go
     }
 
     @Override
+    protected void onStart()
+    {
+        super.onStart();
+    }
+
+    @Override
     protected void onStop()
     {
-        unregisterReceiver(myReceiver);
+        stopService(serviceIntent);
         super.onStop();
     }
 
-    private class MyReceiver extends BroadcastReceiver {
-
+    private BroadcastReceiver LocationReciever = new BroadcastReceiver() {
         @Override
-        public void onReceive(Context arg0, Intent arg1) {
-            double lat= arg1.getDoubleExtra("lat", 0);
-            double lng= arg1.getDoubleExtra("long", 0);
-            mMap.moveCamera(CameraUpdateFactory.newLatLng(new LatLng(lat,lng)));
+        public void onReceive(Context context, Intent intent) {
+            // Get extra data included in the Intent
+            mere=1;
+            Toast.makeText(parKING.this, "Hai boss", Toast.LENGTH_SHORT).show();
+            String message = intent.getStringExtra("Status");
+            Bundle b = intent.getBundleExtra("Location");
+            location = b.getParcelable("Location");
+            actual = new CameraPosition.Builder().target(new LatLng(location.getLatitude(),location.getLongitude()))
+                            .zoom(19.0f)
+                            .bearing(location.getBearing())
+                            .tilt(60)
+                            .build();
+            mMap.moveCamera(CameraUpdateFactory.newCameraPosition(actual));
         }
+    };
 
-    }
+
 
 
 }

@@ -19,7 +19,9 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
+import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
+import android.widget.Toast;
 
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.LocationRequest;
@@ -40,17 +42,21 @@ public class UserLocation extends Service implements GoogleApiClient.ConnectionC
     final static String MY_ACTION = "MY_ACTION";
 
     public void onCreate() {
+
+        Toast.makeText(UserLocation.this, "Mere Serviceu doamne da", Toast.LENGTH_SHORT).show();
         if (mGoogleApiClient == null) {
             mGoogleApiClient = new GoogleApiClient.Builder(this)
                     .addConnectionCallbacks(this)
                     .addOnConnectionFailedListener(this)
                     .addApi(LocationServices.API)
                     .build();
+
         }
     }
 
     @Override
     public void onConnected(@Nullable Bundle bundle) {
+
         mGoogleApiClient.connect();
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED);
@@ -67,11 +73,14 @@ public class UserLocation extends Service implements GoogleApiClient.ConnectionC
 
     protected void startLocationUpdates() {
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED);
-        //N-avem conexiune
-        else
-        LocationServices.FusedLocationApi.requestLocationUpdates(
-                mGoogleApiClient, mLocationRequest, this);
+                != PackageManager.PERMISSION_GRANTED) ;
+            //N-avem conexiune
+        else {
+            createLocationRequest();
+            LocationServices.FusedLocationApi.requestLocationUpdates(
+                    mGoogleApiClient, mLocationRequest, this);
+
+        }
     }
 
     @Override
@@ -84,6 +93,7 @@ public class UserLocation extends Service implements GoogleApiClient.ConnectionC
                 mGoogleApiClient, this);
         mGoogleApiClient.disconnect();
     }
+
 
     protected void createLocationRequest() {
         mLocationRequest = new LocationRequest();
@@ -107,11 +117,16 @@ public class UserLocation extends Service implements GoogleApiClient.ConnectionC
     @Override
     public void onLocationChanged(Location location) {
         mLastLocation = location;
-        Intent intent = new Intent();
-        intent.setAction(MY_ACTION);
-        intent.putExtra("Lat",mLastLocation.getLatitude());
-        intent.putExtra("Long",mLastLocation.getLongitude());
-        sendBroadcast(intent);
+        sendMessageToActivity(location);
+    }
+
+    private  void sendMessageToActivity(Location l) {
+        Intent intent = new Intent("GPSLocationUpdates");
+        // You can also include some extra data
+        Bundle b = new Bundle();
+        b.putParcelable("Location", l);
+        intent.putExtra("Location", b);
+        LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
     }
 
 
