@@ -12,6 +12,9 @@ import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationManager;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
+import android.os.Handler;
 import android.os.IBinder;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
@@ -27,7 +30,11 @@ import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.widget.Toast;
 
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.toolbox.Volley;
 
+import com.google.android.gms.appdatasearch.GetRecentContextCall;
 import com.google.android.gms.common.SupportErrorDialogFragment;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
@@ -45,6 +52,11 @@ import com.google.android.gms.maps.UiSettings;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
+
+
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.Console;
 
@@ -72,11 +84,15 @@ public class parKING extends AppCompatActivity implements OnMapReadyCallback,Goo
                     .build();
 
     public static CameraPosition actual;
+    //parcari
+    public int nrParkings=2;
+    public ParkingLot[] parkLot=new ParkingLot[4];
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_par_king);
+
 
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
@@ -85,23 +101,20 @@ public class parKING extends AppCompatActivity implements OnMapReadyCallback,Goo
         isGpsConnected();
         createLocationRequest();
         buildGoogleApiClient();
+
     }
 
-    /**
-     * Manipulates the map once available.
-     * This callback is triggered when the map is ready to be used.
-     * This is where we can add markers or lines, add listeners or move the camera. In this case,
-     * we just add a marker near Sydney, Australia.
-     * If Google Play services is not installed on the device, the user will be prompted to install
-     * it inside the SupportMapFragment. This method will only be triggered once the user has
-     * installed Google Play services and returned to the app.
-     */
+
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap=googleMap;
+        //Database
+        if(isOnline()) {
+            memoriePentruParcari();
+            getParksFromDB();
+        }
 
-       // mMap.setMyLocationEnabled(true);
-        //mMap.setOnMyLocationButtonClickListener(this);
+
 
         enableMyLocation();
         // Add a marker in Sydney and move the camera
@@ -109,6 +122,54 @@ public class parKING extends AppCompatActivity implements OnMapReadyCallback,Goo
         // mMap.moveCamera(CameraUpdateFactory.newLatLng(new LatLng(46.7772, 23.5999)));
 
         }
+    public int i=1;
+    private void getParksFromDB()
+    {
+            Response.Listener<String> responseListener = new Response.Listener<String>() {
+                @Override
+                public void onResponse(String response) {
+                    try {
+                        JSONObject jsonResponse = new JSONObject(response);
+                        boolean success = jsonResponse.getBoolean("success");
+                        if (success) {
+                            parkLot[i].latitude=jsonResponse.getDouble("latitude");
+                            parkLot[i].longitude=jsonResponse.getDouble("longitude");
+                            mMap.addMarker(new MarkerOptions()
+                                    .position(new LatLng(parkLot[i].latitude, parkLot[i].longitude))
+                                    .title("Parking lot number: " + i ));
+
+                        } else {
+                            AlertDialog.Builder builder = new AlertDialog.Builder(parKING.this);
+                            builder.setMessage("Failed to get Parking lots")
+                                    .setNegativeButton("Retry", null)
+                                    .create()
+                                    .show();
+                        }
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                }
+            };
+        for(i=1;i<=nrParkings;i++) {
+            ParkingsLocation parkRequest = new ParkingsLocation(i, responseListener);
+            RequestQueue queue = Volley.newRequestQueue(parKING.this);
+            queue.add(parkRequest);
+        }
+    }
+
+    private boolean isOnline() {
+        ConnectivityManager cm =
+                (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo netInfo = cm.getActiveNetworkInfo();
+        return netInfo != null && netInfo.isConnectedOrConnecting();
+    }
+
+    private void memoriePentruParcari() {
+        for(int i=1;i<=nrParkings+1;i++)
+            parkLot[i] = new ParkingLot();
+
+    }
+
 
     private void enableMyLocation() {
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION)
@@ -151,10 +212,25 @@ public class parKING extends AppCompatActivity implements OnMapReadyCallback,Goo
             mPermissionDenied = false;
         }
     }
+    //pt delay sa fie false mMapIsTouched
+/*    Handler myHandler;
+
+    Runnable r = new Runnable() {
+        @Override
+        public void run(){
+            mMapIsTouched=false;
+        }
+    };
+*/
 
     @Override
     public boolean onMyLocationButtonClick() {
-
+        /*myHandler.postDelayed(r,1000);
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }*/
         mMapIsTouched=false;
         return false;
     }
@@ -236,7 +312,6 @@ public class parKING extends AppCompatActivity implements OnMapReadyCallback,Goo
                 != PackageManager.PERMISSION_GRANTED) ;
             //N-avem conexiune
         else {
-            Toast.makeText(this,"Merge conexiunea la gps",Toast.LENGTH_LONG).show();
             createLocationRequest();
             LocationServices.FusedLocationApi.requestLocationUpdates(
                     mGoogleApiClient, mLocationRequest, this);
@@ -261,8 +336,12 @@ public class parKING extends AppCompatActivity implements OnMapReadyCallback,Goo
     @Override
     public void onLocationChanged(Location location) {
         mLastLocation = location;
+        if(mMapIsTouched)
+            Toast.makeText(this,"mMapIsTouched==True",Toast.LENGTH_SHORT).show();
+        else
+            Toast.makeText(this,"mMapIsTouched==False",Toast.LENGTH_SHORT).show();
 
-        if(mMapIsTouched==false)
+        if(!mMapIsTouched)
         {
             CameraPosition currentposition=mMap.getCameraPosition();
             actual =
