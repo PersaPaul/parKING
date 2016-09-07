@@ -93,7 +93,7 @@ public class parKING extends AppCompatActivity implements OnMapReadyCallback,Goo
 
     public static CameraPosition actual;
     //parcari
-    public int nrParkings=2;
+    public int nrParkings;
     public ParkingLot[] parkLot=new ParkingLot[4];
 
     //adresa
@@ -159,15 +159,50 @@ public class parKING extends AppCompatActivity implements OnMapReadyCallback,Goo
         // mMap.moveCamera(CameraUpdateFactory.newLatLng(new LatLng(46.7772, 23.5999)));
 
         }
-    public int i=1;
+    public int i;
     private void getParksFromDB()
     {
+
+        Response.Listener<String> nrResponseListener = new Response.Listener<String>() {
+            @Override
+            public void onResponse(String response) {
+                try {
+                    JSONObject jsonResponse = new JSONObject(response);
+                    boolean success = jsonResponse.getBoolean("success");
+
+                    if (success) {
+                        nrParkings = jsonResponse.getInt("nrPark");
+
+
+                    } else {
+                        AlertDialog.Builder builder = new AlertDialog.Builder(parKING.this);
+                        builder.setMessage("Database connection failed")
+                                .setNegativeButton("Retry", null)
+                                .create()
+                                .show();
+                    }
+
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+        };
+
+        ParkingsNumber nrParkRequest = new ParkingsNumber(nrResponseListener);
+        RequestQueue queue1 = Volley.newRequestQueue(parKING.this);
+        queue1.add(nrParkRequest);
+
             Response.Listener<String> responseListener = new Response.Listener<String>() {
                 @Override
                 public void onResponse(String response) {
                     try {
                         JSONObject jsonResponse = new JSONObject(response);
                         boolean success = jsonResponse.getBoolean("success");
+                        AlertDialog.Builder builder = new AlertDialog.Builder(parKING.this);
+                        builder.setMessage(String.valueOf(success))
+                                .setNegativeButton("Succesu ca sucesu da de ce nu merge?", null)
+                                .create()
+                                .show();
                         if (success) {
                             parkLot[i].latitude=jsonResponse.getDouble("latitude");
                             parkLot[i].longitude=jsonResponse.getDouble("longitude");
@@ -175,9 +210,10 @@ public class parKING extends AppCompatActivity implements OnMapReadyCallback,Goo
                                     .position(new LatLng(parkLot[i].latitude, parkLot[i].longitude))
                                     .title("Parking lot number: " + i ));
 
+
                         } else {
-                            AlertDialog.Builder builder = new AlertDialog.Builder(parKING.this);
-                            builder.setMessage("Failed to get Parking lots")
+                            builder = new AlertDialog.Builder(parKING.this);
+                            builder.setMessage("Database connection failed")
                                     .setNegativeButton("Retry", null)
                                     .create()
                                     .show();
@@ -187,7 +223,12 @@ public class parKING extends AppCompatActivity implements OnMapReadyCallback,Goo
                     }
                 }
             };
-        for(i=1;i<=nrParkings;i++) {
+
+
+        nrParkings=5;
+
+        for(int i=1;i<=nrParkings;i++) {
+
             ParkingsLocation parkRequest = new ParkingsLocation(i, responseListener);
             RequestQueue queue = Volley.newRequestQueue(parKING.this);
             queue.add(parkRequest);
@@ -202,7 +243,7 @@ public class parKING extends AppCompatActivity implements OnMapReadyCallback,Goo
     }
 
     private void memoriePentruParcari() {
-        for(int i=1;i<=nrParkings+1;i++)
+        for(i=1;i<=nrParkings+1;i++)
             parkLot[i] = new ParkingLot();
 
     }
@@ -371,8 +412,8 @@ public class parKING extends AppCompatActivity implements OnMapReadyCallback,Goo
 
     protected void createLocationRequest() {
         mLocationRequest = new LocationRequest();
-        mLocationRequest.setInterval(500);
-        mLocationRequest.setFastestInterval(500);
+        mLocationRequest.setInterval(5);
+        mLocationRequest.setFastestInterval(1);
         mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
     }
 
@@ -383,11 +424,11 @@ public class parKING extends AppCompatActivity implements OnMapReadyCallback,Goo
     @Override
     public void onLocationChanged(Location location) {
         mLastLocation = location;
-        if(mMapIsTouched)
+    /*    if(mMapIsTouched)
             Toast.makeText(this,"mMapIsTouched==True",Toast.LENGTH_SHORT).show();
         else
             Toast.makeText(this,"mMapIsTouched==False",Toast.LENGTH_SHORT).show();
-
+    */
         if(!mMapIsTouched)
         {
             CameraPosition currentposition=mMap.getCameraPosition();
